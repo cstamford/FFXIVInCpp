@@ -7,6 +7,34 @@
 
 #include <Offsets/Memory.hpp>
 
+#include "MinHook.h"
+
+bool mem_hook(const char* name, void* address, void* new_address, void** call_original_addr)
+{
+    if (static bool init = false; !init)
+    {
+        MH_Initialize();
+        init = true;
+    }
+
+    MH_STATUS ret = MH_CreateHook(address, new_address, call_original_addr);
+
+    if (ret == MH_OK)
+    {
+        printf("SUCCESS hooking %s\n", name);
+        MH_EnableHook(address);
+        return true;
+    }
+
+    printf("FAILURE %d hooking %s\n", ret, name);
+    return false;
+}
+
+void mem_hook_free(void* address)
+{
+    MH_DisableHook(address);
+}
+
 uintptr_t mem_scan(const MemoryData* mem, const char* signature, const MemorySectionType::Enum section)
 {
     std::string str = signature;
@@ -75,37 +103,6 @@ uintptr_t mem_scan(const MemoryData* mem, const char* signature, const MemorySec
     return addr;
 }
 
-uintptr_t mem_lookup_data(const MemoryData* mem, const uintptr_t text_addr)
-{
-    // We're going to step through memory from this address, looking for a relative mov...
-    // We read four bytes, we check if these four bytes fall into any of our data sections (relative to the next instruction)
-    // If we do, we've resolved.
-
-    const MemorySection& data = mem->sections[MemorySectionType::Data];
-    const MemorySection& rdata = mem->sections[MemorySectionType::RData];
-
-    static constexpr uintptr_t MAX_INST_LEN = 1024;
-    for (uintptr_t i = 0; i < MAX_INST_LEN; ++i)
-    {
-        // This is the value of the assembly...
-        const uintptr_t offset = mem_read<int32_t>(text_addr + i);
-
-        // The resolved address is the full address, plus the number of bytes we have skipped, plus 4 (RIP relative load; next inst), plus the offset
-        const uintptr_t resolved_addr = text_addr + i + 4 + offset;
-
-        // Now check if the offset (resolved address minus base address) falls in either data or rdata.
-        // To find this offset in IDA, it's the base address + the offset_addr; the base is usually 0x140000000
-        if (const uintptr_t offset_addr = resolved_addr - mem->base_addr;
-            (offset_addr >= data.offset && offset_addr < data.offset + data.size) ||
-            (offset_addr >= rdata.offset && offset_addr < rdata.offset + rdata.size))
-        {
-            return resolved_addr;
-        }
-    }
-
-    return 0;
-}
-
 uintptr_t mem_ida_addr(const MemoryData* mem, const uintptr_t addr)
 {
     return addr - mem->base_addr + 0x140000000;
@@ -113,6 +110,8 @@ uintptr_t mem_ida_addr(const MemoryData* mem, const uintptr_t addr)
 
 MemoryData mem_init()
 {
+    printf("\nInitializing memory.\n");
+
     MemoryData data;
 
     const uintptr_t base_addr = (uintptr_t)GetModuleHandle(NULL);
