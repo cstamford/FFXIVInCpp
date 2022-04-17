@@ -1,7 +1,11 @@
 #pragma once
 
+#include <Offsets/Generated/Actions.hpp>
+#include <Offsets/Generated/Jobs.hpp>
+
 #include <cstddef>
 #include <cstdint>
+
 
 struct Framework
 {
