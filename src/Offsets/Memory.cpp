@@ -77,7 +77,7 @@ uintptr_t mem_scan(const MemoryData* mem, const char* signature, const MemorySec
             const uint8_t data = mem_read<uint8_t>(mem->base_addr + section_offset + offset, i);
             if (mask[i] && data != pattern[i])
             {
-                offset += i + 1;
+                ++offset;
                 found = false;
                 break;
             }
