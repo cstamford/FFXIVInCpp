@@ -1,6 +1,8 @@
 #pragma once
 
-enum class Job
+#include <cstdint>
+
+enum class Job : uint8_t
 {
     ADV = 0,
     GLA = 1,

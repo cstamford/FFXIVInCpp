@@ -98,7 +98,9 @@ List<(string, List<string>)> JobEnums(List<Job> jobs, List<Action> actions)
     {
         "#pragma once",
         "",
-        "enum class Job",
+        "#include <cstdint>",
+        "",
+        "enum class Job : uint8_t",
         "{",
         jobs.Select((j, idx) => $"    {j.abbrev} = {idx}").Aggregate((a, b) => a + ",\n" + b),
         "};",
