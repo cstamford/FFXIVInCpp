@@ -30,6 +30,22 @@ std::string g_path_to_landing_pad;
 bool (*update_hook_original)(Framework* instance);
 bool update_hook(Framework* instance);
 
+void axe_anti_debug()
+{
+	// There is an anti debugger that crashes the game. It is a simple check that we're going to noop to 0.
+	const uintptr_t anti_debug_addr = mem_scan(&g_mem_data, "FF 15 ?? ?? ?? ?? 85 C0 74 11", MemorySectionType::Text);
+	printf("\nAnti debug address: %llx\n", anti_debug_addr);
+
+	const uint8_t inst[] = { 0x90, 0xB8, 0x00, 0x00, 0x00, 0x00 }; // nop; mov eax, 0
+
+	DWORD old_protect;
+	VirtualProtect((LPVOID)anti_debug_addr, sizeof(inst), PAGE_READWRITE, &old_protect);
+	memcpy((void*)anti_debug_addr, inst, sizeof(inst));
+	VirtualProtect((LPVOID)anti_debug_addr, sizeof(inst), old_protect, &old_protect);
+
+	printf("Anti debug patched!\n");
+}
+
 void hooks_init()
 {
 	printf("\nHooking functions.\n");
@@ -100,6 +116,10 @@ BOOL APIENTRY DllMain(HINSTANCE module, DWORD reason, LPVOID)
 		g_mem_data = mem_init();
 		g_offsets_data = offsets_init(&g_mem_data);
 
+#ifndef NDEBUG
+		axe_anti_debug();
+#endif
+
 		hooks_init();
 		project_load();
 	}
@@ -114,6 +134,7 @@ bool update_hook(Framework* instance)
 	const float dt = std::chrono::duration_cast<std::chrono::nanoseconds>(now - last).count() / 1000.0f / 1000.0f / 1000.0f;
 	last = now;
 
+#ifndef NDEBUG
 	if (GetAsyncKeyState(VK_CONTROL) && GetAsyncKeyState(VK_F11) && g_project.handle != NULL)
 	{
 		project_unload();
@@ -123,6 +144,7 @@ bool update_hook(Framework* instance)
 	{
 		project_load();
 	}
+#endif
 
 	if (g_project.update != nullptr)
 	{
